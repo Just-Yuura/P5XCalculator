@@ -1,0 +1,4 @@
+numpy==2.3.4
+requests==2.32.5
+ttkbootstrap==1.18.2
+pywinstyles==1.8

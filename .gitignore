@@ -1,0 +1,15 @@
+# PyCharm
+.idea/
+
+# Virtual environment
+.venv/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.py[cod]
+*$py.class
+
+dist/
+build/
+release/
