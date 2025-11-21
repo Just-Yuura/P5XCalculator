@@ -3,17 +3,17 @@ import threading
 import pywinstyles
 import ttkbootstrap as ttk
 import src.gui.helpers.validators as validators
-from pathlib import Path
-from tkinter import PhotoImage
+from tkinter import PhotoImage, messagebox
 from src.core.simulator import Simulator
 from ttkbootstrap.widgets import ToolTip
 from src.gui.loading_popup import LoadingPopup
+from src.gui.results_popup import ResultsPopup
 from src.model.enum.banner_type import BannerType
 from src.gui.banner_selector import BannerSelector
 from src.model.enum.simulation_type import SimulationType
 from src.util.paths import get_external_path, get_resource_path
-from src.gui.helpers.build_character_name_string import build_character_name_string
-from src.gui.helpers.screen import calculate_screen_center_x, calculate_screen_center_y
+from src.gui.helpers.screen import calculate_screen_center_x, calculate_screen_center_y, get_screen_height, get_screen_width
+
 
 class MainWindow(ttk.Window):
     def __init__(self):
@@ -35,31 +35,36 @@ class MainWindow(ttk.Window):
         self.patch_data = self._load_patch_data()
 
         self.banner_selector = None
-        self.result_frame = None
         self.loading_popup = None
 
-        self._init_app_window()
+        self._add_scroll_config()
         self._build_gui()
+        self._init_app_window()
 
 
     def _init_app_window(self):
-        app_width = 800
-        app_height = 800
-
         self.update_idletasks()
+
+        required_width = self.main_container.winfo_reqwidth() + 40
+        required_height = self.main_container.winfo_reqheight() + 20
+
+        screen_width = get_screen_width(self)
+        screen_height = get_screen_height(self)
+
+        app_width = min(required_width, int(screen_width * 0.9))
+        app_height = min(int(required_height), int(screen_height * 0.9))
+
         app_pos_x = calculate_screen_center_x(self, app_width)
         app_pos_y = calculate_screen_center_y(self, app_height)
 
         self.title("P5X Gacha Pull Calculator")
         self.geometry(f"{app_width}x{app_height}+{app_pos_x}+{app_pos_y}")
-        self.resizable(False, False)
         self._set_icon()
 
         pywinstyles.apply_style(self, "dark")
 
 
     def _set_icon(self):
-        src_dir = Path(__file__).parent.parent
         icon_path = get_resource_path("assets/app_icon.png")
 
         self.icon = PhotoImage(file=str(icon_path))
@@ -76,10 +81,7 @@ class MainWindow(ttk.Window):
     def _build_gui(self):
         vcmd = (self.register(validators.validate_integer), "%P")
 
-        container = ttk.Frame(self)
-        container.pack(expand=True, fill="both", padx=20, pady=10)
-
-        inputs_container = ttk.Frame(container)
+        inputs_container = ttk.Frame(self.main_container)
         inputs_container.pack(expand=True, fill="x", anchor="n")
 
         self._build_user_inputs(inputs_container, vcmd)
@@ -95,9 +97,6 @@ class MainWindow(ttk.Window):
             command=self._run_simulation
         )
         start_calc_btn.pack(anchor="center")
-
-        self.result_frame = ttk.Frame(inputs_container) #This is false? It should probably be in its own container, I assume?
-        self.result_frame.pack(fill="x", pady=(20,0))
 
 
     def _build_user_inputs(self, container, vcmd):
@@ -346,16 +345,17 @@ class MainWindow(ttk.Window):
 
         self.banner_selector = BannerSelector(
             container,
-            self.patch_data,
-            height=200
+            self.patch_data
         )
         self.banner_selector.pack(fill="x", pady=(0, 5))
 
+        def _handle_banner_scroll(e):
+            return "break" if hasattr(self.banner_selector, 'internal_canvas') else None
+
+        self.banner_selector.bind("<MouseWheel>", _handle_banner_scroll)
+
 
     def _run_simulation(self):
-        for widget in self.result_frame.winfo_children():
-            widget.destroy()
-
         sim = Simulator(
             self.simulation_type.get(),
             self.banner_type.get(),
@@ -372,6 +372,8 @@ class MainWindow(ttk.Window):
         )
 
         self.loading_popup = LoadingPopup(self)
+        self.loading_popup.lift()
+        self.loading_popup.grab_set()
 
         thread = threading.Thread(target=self._run_simulation_thread, args=(sim,), daemon=True)
         thread.start()
@@ -391,7 +393,9 @@ class MainWindow(ttk.Window):
             self.loading_popup.close()
             self.loading_popup = None
 
-        self._display_results(results)
+        results_popup = ResultsPopup(self, results)
+        results_popup.lift()
+        results_popup.grab_set()
 
 
     def _on_simulation_error(self, error_message):
@@ -399,151 +403,50 @@ class MainWindow(ttk.Window):
             self.loading_popup.close()
             self.loading_popup = None
 
-        error_label = ttk.Label(
-            self.result_frame,
-            text=f"Error running simulation: {error_message}",
-            bootstyle="danger",
-            font=("TkDefaultFont", 10)
-        )
-        error_label.pack(anchor="center", pady=20)
+        messagebox.showerror("Simulation Error", f"Error running simulation: {error_message}")
 
 
-    def _display_results(self, results):
-        success_rate = results["success_rate"]
-        successful_runs = results["successful_runs"]
-        total_runs = results["total_runs"]
+    def _add_scroll_config(self):
+        canvas = ttk.Canvas(self, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview, bootstyle="round")
 
-        separator = ttk.Separator(self.result_frame, orient="horizontal")
-        separator.pack(fill="x", pady=(0, 15))
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
 
+        scrollable_frame = ttk.Frame(canvas)
+        self.main_container = ttk.Frame(scrollable_frame)
+        self.main_container.pack(anchor="nw", padx=20, pady=10)
 
-        title_label = ttk.Label(
-            self.result_frame,
-            text="Simulation Results",
-            font=("TkDefaultFont", 12, "bold")
-        )
-        title_label.pack(anchor="center", pady=(0, 10))
+        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
 
+        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(canvas_window, width=e.width))
 
-        stats_container = ttk.Frame(self.result_frame)
-        stats_container.pack(fill="both", expand=True, pady=(10, 0))
+        def on_frame_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            if canvas.winfo_width() > 1:
+                canvas.itemconfig(canvas_window, width=canvas.winfo_width())
 
-        stats_container.columnconfigure(0, weight=1)
-        stats_container.columnconfigure(1, weight=1)
+        scrollable_frame.bind("<Configure>", on_frame_configure)
 
-        # Overall Statistics
-        left_frame = ttk.Frame(stats_container)
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        def _on_mousescroll(e):
+            widget = self.winfo_containing(e.x_root, e.y_root)
 
+            if widget and self.banner_selector:
+                current = widget
+                while current:
+                    if current == self.banner_selector:
+                        return "break"
+                    current = current.master
 
-        left_title = ttk.Label(
-            left_frame,
-            text="Overall Success Rate",
-            font=("TkDefaultFont", 11, "bold")
-        )
-        left_title.pack(anchor="w", pady=(0, 10))
+            canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+            return "break"
 
+        canvas.bind_all("<MouseWheel>", _on_mousescroll)
 
-        if success_rate >= 75:
-            color_style = "success"
-        elif success_rate >= 50:
-            color_style = "warning"
-        else:
-            color_style = "danger"
+        canvas.configure(scrollregion=canvas.bbox("all"))
 
-        success_label = ttk.Label(
-            left_frame,
-            text=f"{success_rate:.2f}%",
-            font=("TkDefaultFont", 20, "bold"),
-            bootstyle=color_style
-        )
-        success_label.pack(anchor="w", pady=(0, 5))
-
-
-        details_label = ttk.Label(
-            left_frame,
-            text=f"Successfully obtained all desired characters and weapons\nin {successful_runs:,} out of {total_runs:,} simulations",
-            font=("TkDefaultFont", 9),
-            justify="left"
-        )
-        details_label.pack(anchor="w", pady=(0, 10))
-
-
-        # Failure point analysis
-        if results.get("failure_breakdown"):
-            right_frame = ttk.Frame(stats_container)
-            right_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
-
-            failure_title = ttk.Label(
-                right_frame,
-                text="Failure Points",
-                font=("TkDefaultFont", 11, "bold")
-            )
-            failure_title.pack(anchor="w", pady=(0, 10))
-
-
-            canvas = ttk.Canvas(right_frame, highlightthickness=0)
-            scrollbar = ttk.Scrollbar(right_frame, orient="vertical", command=canvas.yview)
-            failure_list_frame = ttk.Frame(canvas)
-
-            failure_list_frame.bind(
-                "<Configure>",
-                lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-            )
-
-            canvas.create_window((0, 0), window=failure_list_frame, anchor="nw")
-            canvas.configure(yscrollcommand=scrollbar.set)
-
-
-            canvas.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
-            failure_list_frame.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
-
-            canvas.pack(side="left", fill="both", expand=True)
-            scrollbar.pack(side="right", fill="y")
-
-
-            for (banner_version, failure_type, name), data in results["failure_breakdown"]:
-                count = data["count"]
-                failure_pct = (count / total_runs) * 100
-                char_name = build_character_name_string(name)
-
-                if failure_type == "character":
-                    failure_text = f"Patch {banner_version}: Failed to obtain {char_name}"
-                elif failure_type == "weapon":
-                    failure_text = f"Patch {banner_version}: Failed to obtain {char_name}'s weapon."
-                elif failure_type == "duplicate":
-                    if data["obtained_list"]:
-                        avg_obtained = sum(data["obtained_list"]) / len(data["obtained_list"])
-                        failure_text = f"Patch {banner_version}: Failed to obtain all of {char_name}'s\nAwarenesses (Avg: {avg_obtained:.1f} of {data["needed"]})"
-                    else:
-                        failure_text = f"Patch {banner_version}: Failed to obtain all of {char_name}'s\nAwarenesses"
-                elif failure_type == "refinement":
-                    if data["obtained_list"]:
-                        avg_obtained = sum(data["obtained_list"]) / len(data["obtained_list"])
-                        failure_text = f"Patch {banner_version}: Failed to obtain all {char_name}\nRefinements (Avg: {avg_obtained:.1f} of {data["needed"]})"
-                    else:
-                        failure_text = f"Patch {banner_version}: Failed to obtain all {char_name}\nRefinements"
-                else:
-                    failure_text = f"Patch {banner_version}: {failure_type}"
-
-                failure_label = ttk.Label(
-                    failure_list_frame,
-                    text=failure_text,
-                    font=("TkDefaultFont", 9, "bold"),
-                    justify="left"
-                )
-                failure_label.pack(anchor="w", pady=(0, 2))
-                failure_label.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
-
-                failure_pct_label = ttk.Label(
-                    failure_list_frame,
-                    text=f"Failed in {failure_pct:.1f}% of runs ({count:,} / {total_runs:,})",
-                    font=("TkDefaultFont", 8),
-                    foreground="gray",
-                    justify="left"
-                )
-                failure_pct_label.pack(anchor="w", pady=(0, 12))
-                failure_pct_label.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
 
 
     @staticmethod

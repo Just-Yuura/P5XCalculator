@@ -9,7 +9,17 @@ class BannerSelector(ttk.Frame):
         self.patch_data = patch_data
         self.selections = {}
 
-        self.col_widths = [45, 65, 125, 70, 45, 70]
+        self.update_idletasks()
+        parent.update_idletasks()
+
+        parent_width = parent.winfo_width()
+        if parent_width > 100:
+            available_width = parent_width - 40
+        else:
+            available_width = 760
+
+        ratios = [0.107, 0.155, 0.297, 0.167, 0.107, 0.167]
+        self.col_widths = [int(available_width * ratio) for ratio in ratios]
 
         self._create_widget()
 
@@ -72,12 +82,12 @@ class BannerSelector(ttk.Frame):
         for col, (text, width) in enumerate(zip(headers, self.col_widths)):
             label = ttk.Label(self.header_frame, text=text, anchor="center" if col in [0, 4] else "w")
             label.grid(row=0, column=col, padx=2, pady=(5, 2), sticky="ew")
-            self.header_frame.grid_columnconfigure(col, minsize=width, uniform="col")
+            self.header_frame.grid_columnconfigure(col, minsize=width)
 
 
     def _create_rows(self):
         for col, width in enumerate(self.col_widths):
-            self.scrollable_frame.grid_columnconfigure(col, minsize=width, uniform="col")
+            self.scrollable_frame.grid_columnconfigure(col, minsize=width)
 
         for idx, patch in enumerate(self.patch_data.get("patches", []), start=0):
             self._create_patch_row(patch, idx)
@@ -91,7 +101,7 @@ class BannerSelector(ttk.Frame):
         row_frame.grid(row=row_idx, column=0, columnspan=6, sticky="ew", padx=0, pady=1)
 
         for i, width in enumerate(self.col_widths):
-            row_frame.grid_columnconfigure(i, minsize=width, uniform="col")
+            row_frame.grid_columnconfigure(i, minsize=width)
 
         if patch_version not in self.selections:
             self.selections[patch_version] = {

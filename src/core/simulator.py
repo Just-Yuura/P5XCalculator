@@ -290,7 +290,7 @@ class Simulator:
                     account.add_jewels(BP_JEWEL_BONUS)
                     account.add_tickets(BP_PLAT_TICKETS)
                     account.add_milicoins(BP_PLAT_COINS)
-                    account.bp_days_left = 60
+                    account.bp_days_left = 45
 
 
     def _pull_character(self, account):
