@@ -11,4 +11,4 @@ A probability calculator and simulator for P5X. Allows you to simulate and forec
 ## Installation
 
 ### Download Executable
-Download the latest release from the [Releases](../../releases) page and run the executable directly.
+Download the latest release from the [Releases](../../releases) page, extract both files to a directory of your chosing, then run the executable directly.
