@@ -45,7 +45,7 @@ class UserAccount:
         self.bp_days_left = int(bp_days_left)
         self.buy_sub = buy_monthly_sub
         self.sub_days_left = int(sub_days_left)
-        self.daily_jewels = 160 if buy_monthly_sub else 60
+        self.daily_jewels = 180 if buy_monthly_sub else 80
 
 
     def add_jewels(self, amount):

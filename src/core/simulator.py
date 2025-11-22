@@ -274,7 +274,7 @@ class Simulator:
                     account.sub_days_left = 30
             else:
                 # No monthly sub, use base daily jewel rate
-                account.add_jewels(remaining_days * 60)
+                account.add_jewels(remaining_days * 80)
                 remaining_days = 0
 
         # Process phantom pass rewards
