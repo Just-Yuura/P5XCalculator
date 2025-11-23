@@ -327,7 +327,7 @@ class Simulator:
                         if guaranteed_next:
                             return True
                         else:
-                            if self.random_pool.get_single() >= 0.5 or self.simulation_type == SimulationType.WORST_LUCK:
+                            if self.random_pool.get_single() >= (0.5 * self.luck_mod):
                                 guaranteed_next = True
                                 break
                             else:
@@ -387,7 +387,7 @@ class Simulator:
                         return True
 
                     # 50/50: Return True on win, go into the next pity cycle on loss
-                    if self.random_pool.get_single() >= 0.5 or self.simulation_type == SimulationType.WORST_LUCK:
+                    if self.random_pool.get_single() >= (0.5 * self.luck_mod):
                         guaranteed_next = True
                         break
                     else:
