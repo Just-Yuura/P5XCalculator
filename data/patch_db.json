@@ -99,6 +99,11 @@
       "version": "4.6.1",
       "patch_type": 1,
       "featured_character": "mitsuru"
+    },
+    {
+      "version": "4.6.2",
+      "patch_type": 1,
+      "featured_character": "fuuka"
     }
   ]
 }
